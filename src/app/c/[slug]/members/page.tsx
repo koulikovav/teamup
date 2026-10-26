@@ -1,6 +1,6 @@
 import { clubContext, requireSeason } from "@/server/club";
 import * as q from "@/server/queries";
-import { addMember, makeLoginLink, makeMaxLink, updateMember } from "../actions";
+import { addMember, makeLoginLink, makeMessengerLink, updateMember } from "../actions";
 import { ResultButton } from "../result-button";
 
 const roleName = { finance_admin: "Начфин", admin: "Админ", member: "Член" } as const;
@@ -29,7 +29,11 @@ export default async function MembersPage({ params }: { params: Promise<{ slug: 
                 <td>
                   {m.fullName}
                   {m.role !== "member" && <div className="ok">{roleName[m.role]}</div>}
-                  {manage && m.status !== "left" && <div className="muted">{m.maxLinked ? "Max подключён" : "Без Max"}</div>}
+                  {manage && m.status !== "left" && (
+                    <div className="muted">
+                      {[m.telegramLinked && "Телеграм", m.maxLinked && "Max"].filter(Boolean).join(", ") || "Без мессенджера"}
+                    </div>
+                  )}
                 </td>
                 <td>
                   {manage ? (
@@ -65,8 +69,15 @@ export default async function MembersPage({ params }: { params: Promise<{ slug: 
                   {manage && m.status !== "left" && (
                     <>
                       <ResultButton action={makeLoginLink} label="Ссылка для входа" fields={{ slug, membershipId: m.id }} />
+                      {!m.telegramLinked && (
+                        <ResultButton
+                          action={makeMessengerLink}
+                          label="Ссылка для Телеграма"
+                          fields={{ slug, membershipId: m.id, kind: "telegram" }}
+                        />
+                      )}
                       {!m.maxLinked && (
-                        <ResultButton action={makeMaxLink} label="Ссылка для Max" fields={{ slug, membershipId: m.id }} />
+                        <ResultButton action={makeMessengerLink} label="Ссылка для Max" fields={{ slug, membershipId: m.id, kind: "max" }} />
                       )}
                     </>
                   )}
