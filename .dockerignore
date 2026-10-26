@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.env
+data
+backups
+.smoke
+*.xlsx
+*.xls
+*.csv
