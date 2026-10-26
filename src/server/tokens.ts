@@ -1,12 +1,14 @@
 // Одноразовые ссылки. В базе хранится только хэш, поэтому утечка базы не даёт войти.
-// login — вход на сайт; max_link — привязка аккаунта Max к человеку в клубе
+// login — вход на сайт; max_link и telegram_link — привязка аккаунта мессенджера к человеку в клубе
 
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { loginTokens } from "@/db/schema";
 
-export type TokenPurpose = "login" | "max_link";
+export type TokenPurpose = "login" | "max_link" | "telegram_link";
+
+export const linkPurpose = (kind: "max" | "telegram") => (kind === "max" ? "max_link" : "telegram_link") satisfies TokenPurpose;
 
 export const newToken = () => randomBytes(32).toString("base64url");
 export const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -45,9 +47,10 @@ export async function loginUrl(userId: string) {
   return `${appUrl()}/login/${await createToken(userId, "login")}`;
 }
 
-// Ссылка открывает бота в Max, и бот получает токен в параметре start
-export async function maxLinkUrl(userId: string) {
-  const bot = process.env.MAX_BOT_NAME;
+// Ссылка открывает бота в мессенджере, и бот получает токен в параметре start
+export async function messengerLinkUrl(kind: "max" | "telegram", userId: string) {
+  const bot = kind === "max" ? process.env.MAX_BOT_NAME : process.env.TELEGRAM_BOT_NAME;
   if (!bot) return null;
-  return `https://max.ru/${bot}?start=${await createToken(userId, "max_link")}`;
+  const site = kind === "max" ? "https://max.ru" : "https://t.me";
+  return `${site}/${bot}?start=${await createToken(userId, linkPurpose(kind))}`;
 }

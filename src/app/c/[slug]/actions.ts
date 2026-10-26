@@ -14,7 +14,7 @@ import { announceEvent, notifyFinanceOfDraft, notifyPayer, remindDebtors, type S
 import { signOut } from "@/server/auth";
 import { audit, clubContext, requirePermission, requireSeason } from "@/server/club";
 import * as ops from "@/server/ops";
-import { loginUrl, maxLinkUrl } from "@/server/tokens";
+import { loginUrl, messengerLinkUrl } from "@/server/tokens";
 
 const str = (f: FormData, k: string) => {
   const v = f.get(k);
@@ -37,14 +37,14 @@ const isoDate = (f: FormData, k: string) => {
 };
 const done = (slug: string, path = "") => revalidatePath(`/c/${slug}${path}`);
 
-// Сбой Max не должен ломать действие на сайте: оплата уже записана
-const quietly = (p: Promise<unknown>) => p.catch((e) => console.error("Max:", e));
+// Сбой мессенджера не должен ломать действие на сайте: оплата уже записана
+const quietly = (p: Promise<unknown>) => p.catch((e) => console.error("Бот:", e));
 
 function sentText(res: Sent | null) {
-  if (!res) return "Бот в Max ещё не подключён";
-  const parts = [`Отправлено в Max: ${res.sent}`];
+  if (!res) return "Боты в мессенджерах ещё не подключены";
+  const parts = [`Отправлено: ${res.sent}`];
   if (res.failed) parts.push(`не дошло: ${res.failed}`);
-  if (res.notLinked.length) parts.push(`без Max: ${res.notLinked.join(", ")}`);
+  if (res.notLinked.length) parts.push(`без мессенджера: ${res.notLinked.join(", ")}`);
   return parts.join(". ");
 }
 
@@ -79,7 +79,7 @@ export async function declarePayment(f: FormData) {
     note: str(f, "note"),
     createdBy: ctx.user.id,
   });
-  // Свой черновик начфин и так видит на странице, сообщение в Max нужно, когда отмечает другой
+  // Свой черновик начфин и так видит на странице, сообщение в мессенджер нужно, когда отмечает другой
   if (!ctx.can("manageMoney")) await quietly(notifyFinanceOfDraft(p.id));
   done(slug, "/money");
 }
@@ -97,7 +97,7 @@ export async function reviewPayment(f: FormData) {
   done(slug, "/money");
 }
 
-// Напоминание должникам в Max. Возвращает строку для показа на странице
+// Напоминание должникам в мессенджерах. Возвращает строку для показа на странице
 export async function remindDebtorsNow(_prev: string | null, f: FormData): Promise<string | null> {
   const slug = need(f, "slug");
   const ctx = await requirePermission(slug, "manageMoney");
@@ -271,14 +271,15 @@ export async function makeLoginLink(_prev: string | null, f: FormData): Promise<
   return url;
 }
 
-// Ссылка открывает бота в Max и привязывает аккаунт к этому человеку
-export async function makeMaxLink(_prev: string | null, f: FormData): Promise<string | null> {
+// Ссылка открывает бота в мессенджере и привязывает аккаунт к этому человеку
+export async function makeMessengerLink(_prev: string | null, f: FormData): Promise<string | null> {
   const slug = need(f, "slug");
   const ctx = await requirePermission(slug, "manageMembers");
   const m = await ownMembership(ctx.club.id, need(f, "membershipId"));
-  const url = await maxLinkUrl(m.userId);
-  if (!url) return "Бот в Max ещё не подключён";
-  await audit(ctx, "member.max_link", "membership", m.id);
+  const kind = need(f, "kind") === "max" ? "max" : "telegram";
+  const url = await messengerLinkUrl(kind, m.userId);
+  if (!url) return `Бот в ${kind === "max" ? "Max" : "Телеграме"} ещё не подключён`;
+  await audit(ctx, `member.${kind}_link`, "membership", m.id);
   return url;
 }
 

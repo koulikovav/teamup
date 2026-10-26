@@ -1,10 +1,8 @@
 // Тонкий клиент Bot API мессенджера Max: только то, что нужно TeamUp.
 // Описание API: https://dev.max.ru/docs-api, официальный клиент — @maxhub/max-bot-api
 
-export type Button =
-  | { type: "callback"; text: string; payload: string }
-  | { type: "link"; text: string; url: string }
-  | { type: "request_contact"; text: string };
+import { phoneFromVcf } from "./commands";
+import type { Incoming, Messenger, OutMessage } from "./types";
 
 export type MaxUser = { user_id: number; first_name: string; last_name?: string; is_bot?: boolean };
 
@@ -28,8 +26,6 @@ export type MaxUpdate =
       message?: MaxMessage | null;
     }
   | { update_type: string; timestamp: number };
-
-export type OutMessage = { text: string; buttons?: Button[][] };
 
 const body = (m: OutMessage) => ({
   text: m.text,
@@ -70,4 +66,37 @@ export function maxApi(token: string, baseUrl = process.env.MAX_API_URL ?? "http
 
 export type MaxApi = ReturnType<typeof maxApi>;
 
-export const SECRET_HEADER = "X-Max-Bot-Api-Secret";
+export const MAX_SECRET_HEADER = "X-Max-Bot-Api-Secret";
+
+export function maxMessenger(api: MaxApi): Messenger {
+  return {
+    kind: "max",
+    forTitle: "для Max",
+    inTitle: "в Max",
+    column: "maxUserId",
+    send: (userId, m) => api.send(userId, m),
+    answer: (callback, notification, replace) => api.answer(callback.id, notification, replace),
+  };
+}
+
+// Событие Max → общий вид. Групповые чаты и сообщения ботов пропускаем
+export function fromMax(update: MaxUpdate): Incoming | null {
+  if (update.update_type === "bot_started" && "user" in update) {
+    return { type: "start", from: String(update.user.user_id), payload: update.payload ?? null };
+  }
+  if (update.update_type === "message_created" && "message" in update) {
+    const { message } = update;
+    const sender = message.sender;
+    if (!sender || sender.is_bot || (message.recipient.chat_type && message.recipient.chat_type !== "dialog")) return null;
+    const contact = message.body.attachments?.find((a) => a.type === "contact");
+    const card = contact?.payload as { vcf_info: string; max_info?: MaxUser | null } | undefined;
+    // Номер принимаем только свой: карточка контакта должна принадлежать отправителю
+    const ownPhone = card && card.max_info?.user_id === sender.user_id ? phoneFromVcf(card.vcf_info) : null;
+    return { type: "text", from: String(sender.user_id), text: message.body.text, ownPhone, sharedContact: !!card };
+  }
+  if (update.update_type === "message_callback" && "callback" in update) {
+    const { callback } = update;
+    return { type: "button", from: String(callback.user.user_id), payload: callback.payload ?? null, callback: { id: callback.callback_id } };
+  }
+  return null;
+}

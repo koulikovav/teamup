@@ -1,4 +1,4 @@
-// Напоминание должникам в Max. Для запуска по расписанию на сервере (например, раз в неделю):
+// Напоминание должникам в Max и Телеграме. Для запуска по расписанию на сервере (например, раз в неделю):
 // до срока оплаты взносов ничего не шлёт, после — напоминает мягко, с кнопкой «Я оплатил».
 //
 //   npm run remind-debts -- ok178
@@ -22,7 +22,7 @@ async function main() {
     process.exit(0);
   }
   const res = await remindDebtors(club.id);
-  if (!res) throw new Error("Бот не настроен: нужен MAX_BOT_TOKEN");
+  if (!res) throw new Error("Бот не настроен: нужен MAX_BOT_TOKEN или TELEGRAM_BOT_TOKEN");
   console.log(`Отправлено: ${res.sent}, ошибок: ${res.failed}`);
   if (res.notLinked.length) console.log(`Без Max: ${res.notLinked.join(", ")}`);
   process.exit(0);

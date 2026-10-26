@@ -32,7 +32,7 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
       </p>
 
       {manage && event.status === "planned" && (
-        <ResultButton action={announceEventNow} label="Разослать в Max с кнопками «еду / не еду»" fields={{ slug, eventId: event.id }} />
+        <ResultButton action={announceEventNow} label="Разослать в мессенджеры с кнопками «еду / не еду»" fields={{ slug, eventId: event.id }} />
       )}
 
       {event.status === "planned" && (

@@ -18,6 +18,7 @@ export async function members(ctx: ClubContext) {
       fullName: s.users.fullName,
       phone: s.users.phone,
       maxLinked: isNotNull(s.users.maxUserId),
+      telegramLinked: isNotNull(s.users.telegramUserId),
       role: s.memberships.role,
       status: s.memberships.status,
       memberNo: s.memberships.memberNo,

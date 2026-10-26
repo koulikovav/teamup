@@ -104,7 +104,7 @@ export default async function MoneyPage({ params }: { params: Promise<{ slug: st
         Всего долгов: {rub(totalDebt)}. Срок уплаты взноса: {season.feeDueOn ? day(season.feeDueOn) : "не задан"}.
       </p>
       {finance && totalDebt > 0 && (
-        <ResultButton action={remindDebtorsNow} label="Напомнить должникам в Max" fields={{ slug }} />
+        <ResultButton action={remindDebtorsNow} label="Напомнить должникам в мессенджерах" fields={{ slug }} />
       )}
       <div className="card scroll">
         <table>
