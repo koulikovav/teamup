@@ -13,4 +13,5 @@ RUN cp -r .next/static .next/standalone/.next/
 
 ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
 EXPOSE 3000
-CMD ["node", ".next/standalone/server.js"]
+# При запуске сначала обновляем таблицы базы, потом стартуем сайт
+CMD ["sh", "-c", "npx drizzle-kit migrate && node .next/standalone/server.js"]
