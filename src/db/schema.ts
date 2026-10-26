@@ -279,10 +279,11 @@ export const auditLog = pgTable(
 
 // ---------------------------------------------------------------- вход
 
-// Одноразовая ссылка для входа: её выдаёт админ или присылает бот. В базе только хэш
+// Одноразовая ссылка: вход на сайт (login) или привязка аккаунта Max (max_link). В базе только хэш
 export const loginTokens = pgTable("login_tokens", {
   id: id(),
   userId: uuid("user_id").notNull().references(() => users.id),
+  purpose: text("purpose").notNull().default("login"),
   tokenHash: text("token_hash").notNull().unique(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   usedAt: timestamp("used_at", { withTimezone: true }),

@@ -1,7 +1,7 @@
 import { clubContext, requireSeason } from "@/server/club";
 import * as q from "@/server/queries";
-import { addMember, updateMember } from "../actions";
-import { LoginLink } from "./login-link";
+import { addMember, makeLoginLink, makeMaxLink, updateMember } from "../actions";
+import { ResultButton } from "../result-button";
 
 const roleName = { finance_admin: "Начфин", admin: "Админ", member: "Член" } as const;
 const statusName = { active: "Участвует", inactive: "Не участвует в сезоне", left: "Выбыл" } as const;
@@ -29,6 +29,7 @@ export default async function MembersPage({ params }: { params: Promise<{ slug: 
                 <td>
                   {m.fullName}
                   {m.role !== "member" && <div className="ok">{roleName[m.role]}</div>}
+                  {manage && m.status !== "left" && <div className="muted">{m.maxLinked ? "Max подключён" : "Без Max"}</div>}
                 </td>
                 <td>
                   {manage ? (
@@ -60,7 +61,16 @@ export default async function MembersPage({ params }: { params: Promise<{ slug: 
                     </span>
                   )}
                 </td>
-                <td>{manage && m.status !== "left" && <LoginLink slug={slug} membershipId={m.id} />}</td>
+                <td>
+                  {manage && m.status !== "left" && (
+                    <>
+                      <ResultButton action={makeLoginLink} label="Ссылка для входа" fields={{ slug, membershipId: m.id }} />
+                      {!m.maxLinked && (
+                        <ResultButton action={makeMaxLink} label="Ссылка для Max" fields={{ slug, membershipId: m.id }} />
+                      )}
+                    </>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

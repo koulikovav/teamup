@@ -1,41 +1,21 @@
 import "server-only";
-import { createHash, randomBytes } from "node:crypto";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { db } from "@/db/client";
-import { loginTokens, sessions, users } from "@/db/schema";
+import { sessions, users } from "@/db/schema";
+import { consumeToken, daysFromNow, hashToken as hash, newToken } from "./tokens";
 
 const SESSION_COOKIE = "teamup_session";
 const SESSION_DAYS = 90;
-const LOGIN_LINK_DAYS = 7;
 
-const newToken = () => randomBytes(32).toString("base64url");
-const hash = (token: string) => createHash("sha256").update(token).digest("hex");
-const daysFromNow = (days: number) => new Date(Date.now() + days * 864e5);
-
-// Ссылка для входа. Её показывает админ или присылает бот в Max
-export async function createLoginToken(userId: string) {
-  const token = newToken();
-  await db()
-    .insert(loginTokens)
-    .values({ userId, tokenHash: hash(token), expiresAt: daysFromNow(LOGIN_LINK_DAYS) });
-  return token;
-}
-
-// Обменивает ссылку на сессию; ссылка срабатывает один раз
+// Обменивает ссылку для входа на сессию; ссылка срабатывает один раз
 export async function signInWithToken(token: string) {
-  const [row] = await db()
-    .update(loginTokens)
-    .set({ usedAt: new Date() })
-    .where(
-      and(eq(loginTokens.tokenHash, hash(token)), isNull(loginTokens.usedAt), gt(loginTokens.expiresAt, new Date())),
-    )
-    .returning();
-  if (!row) return false;
+  const userId = await consumeToken(token, "login");
+  if (!userId) return false;
 
   const sessionToken = newToken();
   const expiresAt = daysFromNow(SESSION_DAYS);
-  await db().insert(sessions).values({ userId: row.userId, tokenHash: hash(sessionToken), expiresAt });
+  await db().insert(sessions).values({ userId, tokenHash: hash(sessionToken), expiresAt });
   (await cookies()).set(SESSION_COOKIE, sessionToken, {
     httpOnly: true,
     sameSite: "lax",

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
@@ -17,6 +17,7 @@ export async function members(ctx: ClubContext) {
       userId: s.users.id,
       fullName: s.users.fullName,
       phone: s.users.phone,
+      maxLinked: isNotNull(s.users.maxUserId),
       role: s.memberships.role,
       status: s.memberships.status,
       memberNo: s.memberships.memberNo,

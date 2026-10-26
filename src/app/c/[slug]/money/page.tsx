@@ -1,7 +1,8 @@
 import { day, rub, today } from "@/lib/format";
 import { clubContext, requireSeason } from "@/server/club";
 import * as q from "@/server/queries";
-import { addCharge, cancelCharge, chargeSeasonFees, declarePayment, reviewPayment } from "../actions";
+import { addCharge, cancelCharge, chargeSeasonFees, declarePayment, remindDebtorsNow, reviewPayment } from "../actions";
+import { ResultButton } from "../result-button";
 
 const kindName = {
   membership_fee: "Взнос",
@@ -102,6 +103,9 @@ export default async function MoneyPage({ params }: { params: Promise<{ slug: st
       <p className="muted">
         Всего долгов: {rub(totalDebt)}. Срок уплаты взноса: {season.feeDueOn ? day(season.feeDueOn) : "не задан"}.
       </p>
+      {finance && totalDebt > 0 && (
+        <ResultButton action={remindDebtorsNow} label="Напомнить должникам в Max" fields={{ slug }} />
+      )}
       <div className="card scroll">
         <table>
           <thead>
