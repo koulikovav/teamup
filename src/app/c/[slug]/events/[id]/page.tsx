@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { day, rub } from "@/lib/format";
 import { clubContext, requireSeason } from "@/server/club";
 import * as q from "@/server/queries";
-import { applyPenalties, markAttendance, rsvp, setOverCapacity } from "../../actions";
+import { announceEventNow, applyPenalties, markAttendance, rsvp, setOverCapacity } from "../../actions";
+import { ResultButton } from "../../result-button";
 
 const responseName = { going: "Еду", not_going: "Не еду", maybe: "Не знаю" } as const;
 
@@ -29,6 +30,10 @@ export default async function EventPage({ params }: { params: Promise<{ slug: st
         {event.location ? `, ${event.location}` : ""}
         {event.mandatory && `. Обязательное${event.missPenalty ? `, штраф за пропуск ${rub(event.missPenalty)}` : ""}`}
       </p>
+
+      {manage && event.status === "planned" && (
+        <ResultButton action={announceEventNow} label="Разослать в Max с кнопками «еду / не еду»" fields={{ slug, eventId: event.id }} />
+      )}
 
       {event.status === "planned" && (
         <form action={rsvp} className="card row">

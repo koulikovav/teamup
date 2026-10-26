@@ -2,8 +2,9 @@ import "server-only";
 import { and, desc, eq } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/db/client";
-import { auditLog, clubs, memberships, seasons } from "@/db/schema";
+import { clubs, memberships, seasons } from "@/db/schema";
 import { currentUser } from "./auth";
+import { audit as writeAudit } from "./ops";
 import { can, type Permission } from "./permissions";
 
 // Контекст страницы клуба: кто смотрит, в каком клубе, какой сезон открыт.
@@ -50,7 +51,5 @@ export function requireSeason(ctx: ClubContext) {
 }
 
 export async function audit(ctx: ClubContext, action: string, entity: string, entityId: string, data?: unknown) {
-  await db()
-    .insert(auditLog)
-    .values({ clubId: ctx.club.id, userId: ctx.user.id, action, entity, entityId, data: data ?? null });
+  await writeAudit(ctx.club.id, ctx.user.id, action, entity, entityId, data);
 }

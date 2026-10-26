@@ -1,0 +1,1 @@
+ALTER TABLE "login_tokens" ADD COLUMN "purpose" text DEFAULT 'login' NOT NULL;

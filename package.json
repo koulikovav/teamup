@@ -13,7 +13,10 @@
     "db:migrate": "drizzle-kit migrate",
     "seed": "tsx --env-file-if-exists=.env scripts/load-seed.ts",
     "report": "tsx --env-file-if-exists=.env scripts/season-report.ts",
-    "login-link": "tsx --env-file-if-exists=.env scripts/login-link.ts"
+    "login-link": "tsx --env-file-if-exists=.env scripts/login-link.ts",
+    "bot:poll": "tsx --env-file-if-exists=.env scripts/bot-poll.ts",
+    "bot:webhook": "tsx --env-file-if-exists=.env scripts/bot-webhook.ts",
+    "remind-debts": "tsx --env-file-if-exists=.env scripts/remind-debts.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.4",

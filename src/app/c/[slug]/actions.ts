@@ -10,8 +10,11 @@ import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { penaltiesForEvent } from "@/domain/penalties";
 import { parseRub, today } from "@/lib/format";
-import { createLoginToken, signOut } from "@/server/auth";
+import { announceEvent, notifyFinanceOfDraft, notifyPayer, remindDebtors, type Sent } from "@/bot/notify";
+import { signOut } from "@/server/auth";
 import { audit, clubContext, requirePermission, requireSeason } from "@/server/club";
+import * as ops from "@/server/ops";
+import { loginUrl, maxLinkUrl } from "@/server/tokens";
 
 const str = (f: FormData, k: string) => {
   const v = f.get(k);
@@ -34,6 +37,17 @@ const isoDate = (f: FormData, k: string) => {
 };
 const done = (slug: string, path = "") => revalidatePath(`/c/${slug}${path}`);
 
+// Сбой Max не должен ломать действие на сайте: оплата уже записана
+const quietly = (p: Promise<unknown>) => p.catch((e) => console.error("Max:", e));
+
+function sentText(res: Sent | null) {
+  if (!res) return "Бот в Max ещё не подключён";
+  const parts = [`Отправлено в Max: ${res.sent}`];
+  if (res.failed) parts.push(`не дошло: ${res.failed}`);
+  if (res.notLinked.length) parts.push(`без Max: ${res.notLinked.join(", ")}`);
+  return parts.join(". ");
+}
+
 async function ownMembership(clubId: string, membershipId: string) {
   const [m] = await db()
     .select()
@@ -55,35 +69,41 @@ export async function declarePayment(f: FormData) {
   const membershipId = target && ctx.can("manageMoney") ? target : ctx.membership.id;
   await ownMembership(ctx.club.id, membershipId);
 
-  const [p] = await db()
-    .insert(s.payments)
-    .values({
-      clubId: ctx.club.id,
-      seasonId: season.id,
-      membershipId,
-      amount: amount(f),
-      paidOn: isoDate(f, "paidOn") ?? today(),
-      method: str(f, "method") === "cash" ? "cash" : "transfer",
-      note: str(f, "note"),
-      status: "draft",
-      createdBy: ctx.user.id,
-    })
-    .returning();
-  await audit(ctx, "payment.declare", "payment", p.id, { amount: p.amount });
+  const p = await ops.declarePayment({
+    clubId: ctx.club.id,
+    seasonId: season.id,
+    membershipId,
+    amount: amount(f),
+    paidOn: isoDate(f, "paidOn"),
+    method: str(f, "method") === "cash" ? "cash" : "transfer",
+    note: str(f, "note"),
+    createdBy: ctx.user.id,
+  });
+  // Свой черновик начфин и так видит на странице, сообщение в Max нужно, когда отмечает другой
+  if (!ctx.can("manageMoney")) await quietly(notifyFinanceOfDraft(p.id));
   done(slug, "/money");
 }
 
 export async function reviewPayment(f: FormData) {
   const slug = need(f, "slug");
   const ctx = await requirePermission(slug, "manageMoney");
-  const status = need(f, "decision") === "confirm" ? "confirmed" : "rejected";
-  const [p] = await db()
-    .update(s.payments)
-    .set({ status, confirmedBy: ctx.user.id, confirmedAt: new Date() })
-    .where(and(eq(s.payments.id, need(f, "paymentId")), eq(s.payments.clubId, ctx.club.id), eq(s.payments.status, "draft")))
-    .returning();
-  if (p) await audit(ctx, `payment.${status}`, "payment", p.id, { amount: p.amount });
+  const p = await ops.reviewPayment({
+    clubId: ctx.club.id,
+    paymentId: need(f, "paymentId"),
+    decision: need(f, "decision") === "confirm" ? "confirm" : "reject",
+    by: ctx.user.id,
+  });
+  if (p) await quietly(notifyPayer(p.id));
   done(slug, "/money");
+}
+
+// Напоминание должникам в Max. Возвращает строку для показа на странице
+export async function remindDebtorsNow(_prev: string | null, f: FormData): Promise<string | null> {
+  const slug = need(f, "slug");
+  const ctx = await requirePermission(slug, "manageMoney");
+  const res = await remindDebtors(ctx.club.id);
+  await audit(ctx, "bot.remind_debts", "club", ctx.club.id, res);
+  return sentText(res);
 }
 
 // ---------------------------------------------------------------- начисления
@@ -246,10 +266,20 @@ export async function makeLoginLink(_prev: string | null, f: FormData): Promise<
   const slug = need(f, "slug");
   const ctx = await requirePermission(slug, "manageMembers");
   const m = await ownMembership(ctx.club.id, need(f, "membershipId"));
-  const token = await createLoginToken(m.userId);
+  const url = await loginUrl(m.userId);
   await audit(ctx, "member.login_link", "membership", m.id);
-  const base = process.env.APP_URL ?? "http://localhost:3000";
-  return `${base}/login/${token}`;
+  return url;
+}
+
+// Ссылка открывает бота в Max и привязывает аккаунт к этому человеку
+export async function makeMaxLink(_prev: string | null, f: FormData): Promise<string | null> {
+  const slug = need(f, "slug");
+  const ctx = await requirePermission(slug, "manageMembers");
+  const m = await ownMembership(ctx.club.id, need(f, "membershipId"));
+  const url = await maxLinkUrl(m.userId);
+  if (!url) return "Бот в Max ещё не подключён";
+  await audit(ctx, "member.max_link", "membership", m.id);
+  return url;
 }
 
 // ---------------------------------------------------------------- мероприятия
@@ -289,31 +319,30 @@ async function clubEvent(clubId: string, eventId: string) {
   return e;
 }
 
-// Отклик члена. Время в очереди сбрасывается, только когда человек заново нажимает «еду»
+// Отклик члена на мероприятие
 export async function rsvp(f: FormData) {
   const slug = need(f, "slug");
   const ctx = await clubContext(slug);
   const event = await clubEvent(ctx.club.id, need(f, "eventId"));
   const response = need(f, "response") as "going" | "not_going" | "maybe";
   if (!["going", "not_going", "maybe"].includes(response)) throw new Error("Неверный ответ");
-  const guests = Math.max(0, Math.min(10, Number(str(f, "guests")) || 0));
-
-  const [existing] = await db()
-    .select()
-    .from(s.eventParticipants)
-    .where(and(eq(s.eventParticipants.eventId, event.id), eq(s.eventParticipants.membershipId, ctx.membership.id)));
-  if (existing) {
-    const requeue = response === "going" && existing.response !== "going";
-    await db()
-      .update(s.eventParticipants)
-      .set({ response, guests, ...(requeue ? { respondedAt: new Date() } : {}) })
-      .where(eq(s.eventParticipants.id, existing.id));
-  } else {
-    await db()
-      .insert(s.eventParticipants)
-      .values({ clubId: ctx.club.id, eventId: event.id, membershipId: ctx.membership.id, response, guests });
-  }
+  await ops.respondToEvent({
+    clubId: ctx.club.id,
+    eventId: event.id,
+    membershipId: ctx.membership.id,
+    response,
+    guests: Number(str(f, "guests")) || 0,
+  });
   done(slug, `/events/${event.id}`);
+}
+
+export async function announceEventNow(_prev: string | null, f: FormData): Promise<string | null> {
+  const slug = need(f, "slug");
+  const ctx = await requirePermission(slug, "manageEvents");
+  const event = await clubEvent(ctx.club.id, need(f, "eventId"));
+  const res = await announceEvent(event.id);
+  await audit(ctx, "bot.announce_event", "event", event.id, res);
+  return sentText(res);
 }
 
 export async function setOverCapacity(f: FormData) {
