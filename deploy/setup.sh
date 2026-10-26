@@ -1,17 +1,46 @@
 #!/usr/bin/env bash
-# Первая установка TeamUp на чистый сервер Ubuntu. Запускать от root:
+# Первая установка TeamUp на сервер Ubuntu. Запускать от root:
 #
-#   curl -fsSL https://raw.githubusercontent.com/koulikovav/teamup/main/deploy/setup.sh | bash -s -- ok178.1.2.3.4.sslip.io
+#   curl -fsSL https://raw.githubusercontent.com/koulikovav/teamup/main/deploy/setup.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/koulikovav/teamup/main/deploy/setup.sh | bash -s -- teamup.ru
 #
-# Аргумент — адрес сайта. Скрипт можно запускать повторно: уже сделанное он пропускает.
+# Без аргумента сайт получает бесплатный адрес teamup.<адрес-сервера>.sslip.io, свой домен можно подключить потом.
+# Уже работающие на сервере программы (например, VPN Amnezia) скрипт не трогает: если порт 443 занят,
+# сайт встаёт на 8443. Запускать можно повторно: уже сделанное скрипт пропускает.
 set -euo pipefail
 
-DOMAIN="${1:?укажите адрес сайта, например ok178.1.2.3.4.sslip.io}"
 DIR=/srv/teamup
+busy() { ss -Hltn "sport = :$1" | grep -q .; }
 
-echo "== Docker"
+echo "== Программы"
+command -v git >/dev/null || { apt-get update -q && apt-get install -yq git; }
+command -v ss >/dev/null || { apt-get update -q && apt-get install -yq iproute2; }
 if ! command -v docker >/dev/null; then
   curl -fsSL https://get.docker.com | sh
+fi
+# Docker мог поставить кто-то другой (например, Amnezia) без docker compose — добавляем только его
+if ! docker compose version >/dev/null 2>&1; then
+  apt-get update -q && { apt-get install -yq docker-compose-v2 || apt-get install -yq docker-compose-plugin; }
+fi
+
+echo "== Адрес и порты"
+if [[ -f $DIR/.env ]]; then
+  echo "Уже настроено, см. $DIR/.env"
+else
+  IP=$(curl -4fsS https://api.ipify.org || hostname -I | awk '{print $1}')
+  DOMAIN="${1:-teamup.$IP.sslip.io}"
+  HTTPS_PORT=443
+  if busy 443; then
+    for p in 8443 88; do busy $p || { HTTPS_PORT=$p; break; }; done
+    [[ $HTTPS_PORT == 443 ]] && { echo "Порты 443, 8443 и 88 заняты, освободите один из них"; exit 1; }
+    echo "Порт 443 занят другой программой, сайт будет на порту $HTTPS_PORT"
+  fi
+  if busy 80; then
+    echo "Порт 80 занят: без него не получить сертификат HTTPS. Освободите порт 80 и запустите скрипт ещё раз"
+    exit 1
+  fi
+  SITE="https://$DOMAIN"
+  [[ $HTTPS_PORT == 443 ]] || SITE="$SITE:$HTTPS_PORT"
 fi
 
 echo "== Подкачка: при 1 ГБ памяти база и сайт без неё могут не поместиться"
@@ -31,7 +60,8 @@ if [[ ! -f .env ]]; then
   secret() { openssl rand -hex 24; }
   cat > .env <<ENV
 DOMAIN=$DOMAIN
-APP_URL=https://$DOMAIN
+APP_URL=$SITE
+HTTPS_PORT=$HTTPS_PORT
 POSTGRES_PASSWORD=$(secret)
 
 # Боты: впишите токены и имена, потом выполните deploy/update.sh и npm run bot:webhook (см. docs/deploy.md)
@@ -41,10 +71,6 @@ TELEGRAM_WEBHOOK_SECRET=$(secret)
 MAX_BOT_TOKEN=
 MAX_BOT_NAME=
 MAX_WEBHOOK_SECRET=$(secret)
-
-# Если порты 80 или 443 заняты другой программой (например, VPN)
-# HTTP_PORT=80
-# HTTPS_PORT=8443
 ENV
   chmod 600 .env
 fi
@@ -62,5 +88,6 @@ SHELL=/bin/bash
 CRON
 
 echo
-echo "Готово. Через минуту сайт откроется по адресу https://$DOMAIN"
-echo "Проверка: curl https://$DOMAIN/api/health"
+set -a; source .env; set +a
+echo "Готово. Через минуту сайт откроется по адресу $APP_URL"
+echo "Проверка: curl $APP_URL/api/health"
