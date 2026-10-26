@@ -1,0 +1,34 @@
+{
+  "club": { "name": "Рыболовный клуб «Демо»", "slug": "demo", "kind": "fishing" },
+  "feeCategories": [
+    { "name": "Стандартный", "amount": 12000 },
+    { "name": "Льготный", "amount": 6000 }
+  ],
+  "season": {
+    "title": "Сезон 2026",
+    "startsOn": "2026-01-11",
+    "endsOn": "2027-01-10",
+    "feeDueOn": "2026-09-01",
+    "openingBalance": 1500
+  },
+  "budget": [
+    { "direction": "income", "name": "Взносы", "planned": 30000 },
+    { "direction": "expense", "name": "Аренда базы", "planned": 18000 },
+    { "direction": "expense", "name": "Прикормка", "planned": 4000 }
+  ],
+  "members": [
+    { "fullName": "Иванов Иван Иванович", "memberNo": 1, "role": "finance_admin", "status": "active", "feeCategory": "Стандартный", "paid": 12000 },
+    { "fullName": "Петров Пётр Петрович", "memberNo": 2, "role": "admin", "status": "active", "feeCategory": "Стандартный", "paid": 8000 },
+    { "fullName": "Сидоров Семён Семёнович", "memberNo": 3, "status": "active", "feeCategory": "Льготный", "paid": 6000,
+      "penalties": [{ "amount": 1000, "note": "Пропуск субботника 12.04", "paid": 1000 }] },
+    { "fullName": "Кузнецов Кирилл Кириллович", "memberNo": 4, "status": "inactive" }
+  ],
+  "expenses": [
+    { "budgetItem": "Аренда базы", "event": "Выезд на озеро", "amount": 9000, "spentOn": "2026-06-14", "description": "База на две ночи" },
+    { "budgetItem": "Прикормка", "amount": 2500, "spentOn": "2026-06-10", "description": "Прикормка на выезд" }
+  ],
+  "events": [
+    { "title": "Субботник на базе", "kind": "work", "startsOn": "2026-04-12", "mandatory": true, "missPenalty": 1000, "status": "done" },
+    { "title": "Выезд на озеро", "kind": "trip", "startsOn": "2026-06-13", "endsOn": "2026-06-14", "capacity": 10, "status": "done" }
+  ]
+}
