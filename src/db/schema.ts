@@ -276,3 +276,23 @@ export const auditLog = pgTable(
   },
   (t) => [index("audit_log_club_created").on(t.clubId, t.createdAt)],
 );
+
+// ---------------------------------------------------------------- вход
+
+// Одноразовая ссылка для входа: её выдаёт админ или присылает бот. В базе только хэш
+export const loginTokens = pgTable("login_tokens", {
+  id: id(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
+
+export const sessions = pgTable("sessions", {
+  id: id(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: createdAt(),
+});

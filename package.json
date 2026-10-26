@@ -12,14 +12,16 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "seed": "tsx --env-file-if-exists=.env scripts/load-seed.ts",
-    "report": "tsx --env-file-if-exists=.env scripts/season-report.ts"
+    "report": "tsx --env-file-if-exists=.env scripts/season-report.ts",
+    "login-link": "tsx --env-file-if-exists=.env scripts/login-link.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.4",
     "next": "15.5.28",
     "postgres": "3.4.9",
     "react": "19.1.10",
-    "react-dom": "19.1.10"
+    "react-dom": "19.1.10",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
