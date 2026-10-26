@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Секреты и локальные настройки
+.env
+.env.*
+!.env.example
+
+# Реальные данные клубов никогда не попадают в репозиторий
+data/
+*.xlsx
+*.xls
+*.csv
+backups/
